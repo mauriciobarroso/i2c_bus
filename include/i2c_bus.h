@@ -73,32 +73,36 @@ extern "C" {
  * @brief Bus communication function pointer which should be mapped to
  * the platform specific read functions of the user
  *
- * @param[in]     reg_addr : 8bit register address of the sensor
- * @param[out]    reg_data : Data from the specified address
- * @param[in]     length   : Length of the reg_data array
- * @param[in,out] intf_ptr : Void pointer that can enable the linking of descriptors
- *                           for interface related callbacks
+ * @param reg_addr : Pointer to register address of the device
+ * @param addr_len : Length of the
+ * @param reg_data : Data from the specified address
+ * @param data_len : Length of the reg_data array
+ * @param intf     : Void pointer that can enable the linking of descriptors
+ *                   for interface related callbacks
+ *
  * @retval 0 for Success
  * @retval Non-zero for Failure
  */
-typedef int8_t (*i2c_bus_read_t)(uint8_t reg_addr, uint8_t *reg_data,
-		uint32_t length, void *intf_ptr);
+typedef int8_t (*i2c_bus_read_t)(uint8_t *reg_addr, uint8_t addr_len,
+		uint8_t *reg_data, uint32_t data_len, void *intf);
 
 /*!
  * @brief Bus communication function pointer which should be mapped to
  * the platform specific write functions of the user
  *
- * @param[in]     reg_addr : 8bit register address of the sensor
- * @param[out]    reg_data : Data to the specified address
- * @param[in]     length   : Length of the reg_data array
- * @param[in,out] intf_ptr : Void pointer that can enable the linking of descriptors
- *                           for interface related callbacks
+ * @param reg_addr : Pointer to register address of the device
+ * @param addr_len : Length of the
+ * @param reg_data : Data from the specified address
+ * @param data_len : Length of the reg_data array
+ * @param intf     : Void pointer that can enable the linking of descriptors
+ *                   for interface related callbacks
+ *
  * @retval 0 for Success
  * @retval Non-zero for Failure
  *
  */
-typedef int8_t (*i2c_bus_write_t)(uint8_t reg_addr, const uint8_t *reg_data,
-		uint32_t length, void *intf_ptr);
+typedef int8_t (*i2c_bus_write_t)(uint8_t *reg_addr, uint8_t addr_len,
+		const uint8_t *reg_data, uint32_t data_len, void *intf);
 
 typedef int8_t i2c_bus_err_t;
 

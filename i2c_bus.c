@@ -49,34 +49,32 @@ static const char *TAG = "i2c_bus";
 
 /* Private function prototypes -----------------------------------------------*/
 /**
- * @brief Function to initialize a AT24CS0x instance
+ * @brief Function that implements the default I2C read transaction
  *
- * @param me      : Pointer to a structure instance of at24cs0x_t
- * @param i2c_bus : Pointer to a structure with the data to initialize the
- * 								    	   sensor as a I2C device
- * @param addr    : I2C device address
- * @param read    : I2C read function pointer
- * @param write   : I2C write function pointer
+ * @param reg_addr : Pointer to the address of the device
+ * @param addr_len : Length of the address
+ * @param reg_data : Pointer to the data to be read from the device
+ * @param data_len : Length of the data
+ * @param intf     : Pointer to the interface descriptor
  *
  * @return ESP_OK on success
  */
-static int8_t i2c_bus_read(uint8_t reg_addr, uint8_t *reg_data,
-		uint32_t length, void *intf_ptr);
+static int8_t i2c_bus_read(uint8_t *reg_addr, uint8_t addr_len,
+		uint8_t *reg_data, uint32_t data_len, void *intf);
 
 /**
- * @brief Function to initialize a AT24CS0x instance
+ * @brief Function that implements the default I2C write transaction
  *
- * @param me      : Pointer to a structure instance of at24cs0x_t
- * @param i2c_bus : Pointer to a structure with the data to initialize the
- * 								    	   sensor as a I2C device
- * @param addr    : I2C device address
- * @param read    : I2C read function pointer
- * @param write   : I2C write function pointer
+ * @param reg_addr : Pointer to the address of the device
+ * @param addr_len : Length of the address
+ * @param reg_data : Pointer to the data to be read from the device
+ * @param data_len : Length of the data
+ * @param intf     : Pointer to the interface descriptor
  *
  * @return ESP_OK on success
  */
-static int8_t i2c_bus_write(uint8_t reg_addr, const uint8_t *reg_data,
-		uint32_t length, void *intf_ptr);
+static int8_t i2c_bus_write(uint8_t *reg_addr, uint8_t addr_len,
+		const uint8_t *reg_data, uint32_t data_len, void *intf);
 
 /* Exported functions definitions --------------------------------------------*/
 esp_err_t i2c_bus_init(i2c_bus_t *const me, int i2c_num, int sda_gpio,
@@ -155,27 +153,77 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 }
 
 /* Private function definitions ----------------------------------------------*/
-static int8_t i2c_bus_read(uint8_t reg_addr, uint8_t *reg_data,
-		uint32_t length, void *intf_ptr) {
+/**
+ * @brief Function that implements the default I2C read transaction
+ */
+static int8_t i2c_bus_read(uint8_t *reg_addr, uint8_t addr_len, uint8_t *reg_data,
+		uint32_t data_len, void *intf) {
 	esp_err_t err = ESP_OK;
 	int8_t rslt = I2C_BUS_OK;
 	i2c_bus_dev_t *comm = NULL;
 
 #ifdef I2C_BUS_BUFFER_SIZE
-	if (length > I2C_BUS_BUFFER_SIZE) {
+	if (data_len > I2C_BUS_BUFFER_SIZE) {
 		return I2C_BUS_E_COM_FAIL;
 	}
 #endif
 
-	if (intf_ptr) {
-		comm = (i2c_bus_dev_t *)intf_ptr;
+	if (intf) {
+		comm = (i2c_bus_dev_t *)intf;
 
-    err = i2c_master_write_read_device(comm->i2c_num, comm->addr, /* fixme: generalize it */
-    		&reg_addr, 1, reg_data, length, 1000 / portTICK_PERIOD_MS);
+    i2c_cmd_handle_t handle = i2c_cmd_link_create();
+    assert (handle != NULL);
 
+    /* Start condition */
+    err = i2c_master_start(handle);
+    if (err != ESP_OK) {
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
+    }
+
+    /* - */
+    err = i2c_master_write_byte(handle, comm->addr << 1 | I2C_MASTER_WRITE, true);
+    if (err != ESP_OK) {
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
+    }
+
+    if (reg_addr) {
+			err = i2c_master_write(handle, reg_addr, addr_len, true);
+			if (err != ESP_OK) {
+				rslt = I2C_BUS_E_COM_FAIL;
+				goto end;
+			}
+    }
+
+    err = i2c_master_start(handle);
+    if (err != ESP_OK) {
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
+    }
+
+    err = i2c_master_write_byte(handle, comm->addr << 1 | I2C_MASTER_READ, true);
+    if (err != ESP_OK) {
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
+    }
+
+    i2c_master_read(handle, reg_data, data_len, I2C_MASTER_LAST_NACK);
+    if (err != ESP_OK) {
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
+    }
+
+    /* Stop condition */
+    i2c_master_stop(handle);
+
+    err = i2c_master_cmd_begin(comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
     if (err != ESP_OK) {
     	rslt = I2C_BUS_E_COM_FAIL;
     }
+
+end:
+		i2c_cmd_link_delete(handle);
 	}
 	else {
 		rslt = I2C_BUS_E_NULL_PTR;
@@ -184,21 +232,24 @@ static int8_t i2c_bus_read(uint8_t reg_addr, uint8_t *reg_data,
 	return rslt;
 }
 
-static int8_t i2c_bus_write(uint8_t reg_addr, const uint8_t *reg_data,
-		uint32_t length, void *intf_ptr) {
+/**
+ * @brief Function that implements the default I2C write transaction
+ */
+static int8_t i2c_bus_write(uint8_t *reg_addr, uint8_t addr_len,
+		const uint8_t *reg_data, uint32_t data_len, void *intf) {
   uint32_t i;
 	esp_err_t err = ESP_OK;
 	int8_t rslt = I2C_BUS_OK;
 	i2c_bus_dev_t *comm = NULL;
 
 #ifdef I2C_BUS_BUFFER_SIZE
-	if (length + 1 > I2C_BUS_BUFFER_SIZE) {
+	if (data_len + 1 > I2C_BUS_BUFFER_SIZE) {
 		return I2C_BUS_E_COM_FAIL;
 	}
 #endif
 
-	if (intf_ptr) {
-		comm = (i2c_bus_dev_t *)intf_ptr;
+	if (intf) {
+		comm = (i2c_bus_dev_t *)intf;
 
 		/* I2C write */
     i2c_cmd_handle_t handle = i2c_cmd_link_create();
@@ -206,28 +257,39 @@ static int8_t i2c_bus_write(uint8_t reg_addr, const uint8_t *reg_data,
 
     err = i2c_master_start(handle);
     if (err != ESP_OK) {
-    	i2c_cmd_link_delete_static(handle);
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
     }
 
     err = i2c_master_write_byte(handle, comm->addr << 1 | I2C_MASTER_WRITE, true); /* fixme: generalize it */
     if (err != ESP_OK) {
-    	i2c_cmd_link_delete_static(handle);
+    	rslt = I2C_BUS_E_COM_FAIL;
+    	goto end;
     }
 
-    err = i2c_master_write_byte(handle, reg_addr, true);
+    err = i2c_master_write(handle, reg_addr, addr_len, true);
+    if (err != ESP_OK) {
+			rslt = I2C_BUS_E_COM_FAIL;
+			goto end;
+		}
 
-    for (i = 0; i < length; i++) {
+    for (i = 0; i < data_len; i++) {
     	err = i2c_master_write_byte(handle, reg_data[i], true);
+      if (err != ESP_OK) {
+      	rslt = I2C_BUS_E_COM_FAIL;
+      	goto end;
+      }
     }
 
     i2c_master_stop(handle);
+
     err = i2c_master_cmd_begin(comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
-
-    i2c_cmd_link_delete(handle);
-
     if (err != ESP_OK) {
     	rslt = I2C_BUS_E_COM_FAIL;
     }
+
+end:
+    i2c_cmd_link_delete(handle);
 	}
 	else {
 		rslt = I2C_BUS_E_NULL_PTR;
