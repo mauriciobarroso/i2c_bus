@@ -128,9 +128,13 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 	/* Variable to return */
 	esp_err_t ret = ESP_OK;
 
-	/* Allocate memory for a new device */
-	me->devs.dev = (i2c_bus_dev_t *)realloc(me->devs.dev, ++(me->devs.num) * sizeof(i2c_bus_dev_t));
+	/* Detect if the device is connected to the bus */
 
+
+	/* Allocate memory for a new device */
+	me->devs.num++;
+	me->devs.dev = (i2c_bus_dev_t *)realloc(me->devs.dev, me->devs.num * sizeof(i2c_bus_dev_t));
+	printf("num:%d\r\n", me->devs.num);
 	/* Fill structure members */
 	if (me->devs.dev) {
 		me->devs.dev[me->devs.num - 1].i2c_num = me->conf.num;
@@ -143,6 +147,21 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 	else {
 		ESP_LOGE(TAG, "Failed to allocate memory for a device");
 		return ESP_ERR_NO_MEM;
+	}
+
+	/* Test the device */
+	uint8_t data = 0;
+	me->devs.dev[me->devs.num - 1].read(NULL, 0, &data, 1, &me->devs.dev[me->devs.num - 1]);
+
+	if (data) {
+		ESP_LOGI(TAG, "Device %s connected to bus", me->devs.dev[me->devs.num - 1].name);
+	}
+	else {
+		ESP_LOGE(TAG, "Device %s not connected to bus", me->devs.dev[me->devs.num - 1].name);
+		me->devs.num--;
+		me->devs.dev = (i2c_bus_dev_t *)realloc(me->devs.dev, me->devs.num * sizeof(i2c_bus_dev_t));
+		printf("num:%d\r\n", me->devs.num);
+		return ESP_FAIL;
 	}
 
 	/* Print successful message */
@@ -174,21 +193,20 @@ static int8_t i2c_bus_read(uint8_t *reg_addr, uint8_t addr_len, uint8_t *reg_dat
     i2c_cmd_handle_t handle = i2c_cmd_link_create();
     assert (handle != NULL);
 
-    /* Start condition */
-    err = i2c_master_start(handle);
-    if (err != ESP_OK) {
-    	rslt = I2C_BUS_E_COM_FAIL;
-    	goto end;
-    }
-
-    /* - */
-    err = i2c_master_write_byte(handle, comm->addr << 1 | I2C_MASTER_WRITE, true);
-    if (err != ESP_OK) {
-    	rslt = I2C_BUS_E_COM_FAIL;
-    	goto end;
-    }
-
     if (reg_addr) {
+			err = i2c_master_start(handle);
+			if (err != ESP_OK) {
+				rslt = I2C_BUS_E_COM_FAIL;
+				goto end;
+			}
+
+			/* - */
+			err = i2c_master_write_byte(handle, comm->addr << 1 | I2C_MASTER_WRITE, true);
+			if (err != ESP_OK) {
+				rslt = I2C_BUS_E_COM_FAIL;
+				goto end;
+			}
+
 			err = i2c_master_write(handle, reg_addr, addr_len, true);
 			if (err != ESP_OK) {
 				rslt = I2C_BUS_E_COM_FAIL;
@@ -223,6 +241,7 @@ static int8_t i2c_bus_read(uint8_t *reg_addr, uint8_t addr_len, uint8_t *reg_dat
     }
 
 end:
+//		ESP_LOGE(TAG, "%s", esp_err_to_name(err));
 		i2c_cmd_link_delete(handle);
 	}
 	else {
