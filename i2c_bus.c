@@ -116,6 +116,14 @@ esp_err_t i2c_bus_init(i2c_bus_t *const me, int i2c_num, int sda_gpio,
   	return ret;
   }
 
+  /* Create mutex */
+  me->mutex = xSemaphoreCreateMutex();
+
+  if (me->mutex == NULL) {
+  	ESP_LOGE(TAG, "Failed to create mutex");
+  	return ESP_ERR_NO_MEM;
+  }
+
 	/* return ESP_OK */
 	return ret;
 }
@@ -134,10 +142,11 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 	/* Allocate memory for a new device */
 	me->devs.num++;
 	me->devs.dev = (i2c_bus_dev_t *)realloc(me->devs.dev, me->devs.num * sizeof(i2c_bus_dev_t));
-	printf("num:%d\r\n", me->devs.num);
+
 	/* Fill structure members */
 	if (me->devs.dev) {
-		me->devs.dev[me->devs.num - 1].i2c_num = me->conf.num;
+		me->devs.dev[me->devs.num - 1].i2c_num = &me->conf.num;
+		me->devs.dev[me->devs.num - 1].mutex = &me->mutex;
 		me->devs.dev[me->devs.num - 1].dev_num = me->devs.num - 1;
 		me->devs.dev[me->devs.num - 1].addr = dev_addr;
 		me->devs.dev[me->devs.num - 1].read = read ?	read : i2c_bus_read;
@@ -151,9 +160,9 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 
 	/* Test the device */
 	uint8_t data = 0;
-	me->devs.dev[me->devs.num - 1].read(NULL, 0, &data, 1, &me->devs.dev[me->devs.num - 1]);
+	int8_t err = me->devs.dev[me->devs.num - 1].read(NULL, 0, &data, 1, &me->devs.dev[me->devs.num - 1]);
 
-	if (data) {
+	if (err == I2C_BUS_OK) {
 		ESP_LOGI(TAG, "Device %s connected to bus", me->devs.dev[me->devs.num - 1].name);
 	}
 	else {
@@ -235,7 +244,9 @@ static int8_t i2c_bus_read(uint8_t *reg_addr, uint8_t addr_len, uint8_t *reg_dat
     /* Stop condition */
     i2c_master_stop(handle);
 
-    err = i2c_master_cmd_begin(comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
+    xSemaphoreTake(*comm->mutex, portMAX_DELAY);
+    err = i2c_master_cmd_begin(*comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
+    xSemaphoreGive(*comm->mutex);
     if (err != ESP_OK) {
     	rslt = I2C_BUS_E_COM_FAIL;
     }
@@ -302,7 +313,9 @@ static int8_t i2c_bus_write(uint8_t *reg_addr, uint8_t addr_len,
 
     i2c_master_stop(handle);
 
-    err = i2c_master_cmd_begin(comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
+    xSemaphoreTake(*comm->mutex, portMAX_DELAY);
+    err = i2c_master_cmd_begin(*comm->i2c_num, handle, 1000 / portTICK_PERIOD_MS);
+    xSemaphoreGive(*comm->mutex);
     if (err != ESP_OK) {
     	rslt = I2C_BUS_E_COM_FAIL;
     }

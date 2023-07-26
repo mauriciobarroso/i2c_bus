@@ -116,15 +116,14 @@ typedef struct { /* todo: place in i2c_bus.h */
 	bool sda_pullup;
 	bool scl_pullup;
 	uint32_t clk_speed;
-	SemaphoreHandle_t mutex;
-	TimerHandle_t timer;
 } i2c_bus_conf_t;
 
 /**
  * @brief Structure to store the device parameter for an I2C device
  */
 typedef struct {
-	int i2c_num;
+	int *i2c_num;
+	SemaphoreHandle_t *mutex;
 	uint8_t dev_num;
 	uint8_t addr;                /* Device address */
 	char name[I2C_BUS_DEV_NAME]; /* Device name */
@@ -145,6 +144,8 @@ typedef struct {
  */
 typedef struct {
 	i2c_bus_conf_t conf; /* I2C bus configuration */
+	SemaphoreHandle_t mutex;
+	TimerHandle_t timer;
 	i2c_bus_devs_t devs; /* Array of I2C devices attached to bus */
 } i2c_bus_t;
 
