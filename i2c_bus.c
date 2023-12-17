@@ -186,7 +186,7 @@ esp_err_t i2c_bus_scan(i2c_bus_t *const me) {
 	/* Variable to return error code */
 	esp_err_t ret = ESP_OK;
 
-	for (uint8_t i = 0; i < 0xFF; i++) {
+	for (uint8_t i = 1; i < 0x80; i++) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (i << 1) | I2C_MASTER_WRITE, 1 /* expect ack */);
@@ -197,8 +197,6 @@ esp_err_t i2c_bus_scan(i2c_bus_t *const me) {
 		if (ret == ESP_OK) {
 			ESP_LOGI(TAG, "Device detected in 0x%X address", i);
 		}
-
-		vTaskDelay(pdMS_TO_TICKS(500));
 	}
 
 	/* Return ESP_OK */
