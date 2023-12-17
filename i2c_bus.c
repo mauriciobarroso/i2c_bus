@@ -179,6 +179,35 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 	return ret;
 }
 
+/**
+ * @brief Function that scans the I2C bus to detect all the devices connected
+ */
+esp_err_t i2c_bus_scan(i2c_bus_t *const me) {
+	/* Variable to return error code */
+	esp_err_t ret = ESP_OK;
+
+	for (uint8_t i = 0; i < 0xFF; i++) {
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (i << 1) | I2C_MASTER_WRITE, 1 /* expect ack */);
+    i2c_master_stop(cmd);
+
+		ret = i2c_master_cmd_begin(me->conf.num, cmd, pdMS_TO_TICKS(10));
+
+		if (ret == ESP_OK) {
+			ESP_LOGI(TAG, "Device detected in %0x%X address");
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(500));
+	}
+
+
+	if ()
+
+	/* Return ESP_OK */
+	return ret;
+}
+
 /* Private function definitions ----------------------------------------------*/
 /**
  * @brief Function that implements the default I2C read transaction
