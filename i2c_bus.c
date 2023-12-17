@@ -159,8 +159,7 @@ esp_err_t i2c_bus_add_dev(i2c_bus_t *const me, uint8_t dev_addr, const char* nam
 	}
 
 	/* Test the device */
-	uint8_t data = 0;
-	int8_t err = me->devs.dev[me->devs.num - 1].read(NULL, 0, &data, 1, &me->devs.dev[me->devs.num - 1]);
+	int8_t err = me->devs.dev[me->devs.num - 1].write(&dev_addr, 1, NULL, 0, &me->devs.dev[me->devs.num - 1]);
 
 	if (err == I2C_BUS_OK) {
 		ESP_LOGI(TAG, "Device %s connected to bus", me->devs.dev[me->devs.num - 1].name);

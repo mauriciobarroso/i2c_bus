@@ -216,6 +216,15 @@ esp_err_t i2c_bus_set_dev_addr(i2c_bus_t *const me, uint8_t dev_addr);
  */
 esp_err_t i2c_bus_set_dev_name(i2c_bus_t *const me, const uint8_t *dev_name);
 
+/**
+ * @brief Function that scans the I2C bus to detect all the devices connected
+ *
+ * @param me       : Pointer to a structure instance of at24cs0x_t
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t i2c_bus_scan(i2c_bus_t *const me);
+
 
 #ifdef __cplusplus
 }
