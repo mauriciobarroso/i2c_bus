@@ -195,14 +195,11 @@ esp_err_t i2c_bus_scan(i2c_bus_t *const me) {
 		ret = i2c_master_cmd_begin(me->conf.num, cmd, pdMS_TO_TICKS(10));
 
 		if (ret == ESP_OK) {
-			ESP_LOGI(TAG, "Device detected in %0x%X address");
+			ESP_LOGI(TAG, "Device detected in 0x%X address", i);
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 	}
-
-
-	if ()
 
 	/* Return ESP_OK */
 	return ret;
