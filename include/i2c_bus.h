@@ -225,7 +225,6 @@ esp_err_t i2c_bus_set_dev_name(i2c_bus_t *const me, const uint8_t *dev_name);
  */
 esp_err_t i2c_bus_scan(i2c_bus_t *const me);
 
-
 #ifdef __cplusplus
 }
 #endif
